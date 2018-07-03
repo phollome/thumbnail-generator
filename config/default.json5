@@ -1,0 +1,22 @@
+{
+  // output dimensions
+  dimensions: [
+    {
+      key: 'large', // Used for output file name. If no key is set width and height are used for file name.
+      width: 1920,
+      height: 1080,
+    },
+    {
+      key: 'mid',
+      width: 960,
+      height: 540,
+    },
+    {
+      key: 'small',
+      width: 480,
+      height: 270.
+    },
+  ],
+  inputPath: './in',
+  outputPath: './out',
+}
