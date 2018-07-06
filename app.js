@@ -104,8 +104,8 @@ function createScreenshot(options) {
   return new Promise((resolve, reject) => {
     const { file, size, outputPath, count, } = options;
     const { width, height, key } = options.dimensions;
-    const extname = extname(file);
-    const noVideo = extname.includes('png') || extname.includes('jpg');
+    const extension = extname(file);
+    const noVideo = extension.includes('png') || extension.includes('jpg');
     const filename = key ? `%b_thumb_${key}.png` : `%b_thumb_${width}x${height}.png`;
     const baseConfig = {
       folder: outputPath,
