@@ -3,7 +3,8 @@ require('dotenv').config();
 const config = require('config');
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
-const { resolve, extname } = require('path');
+const gm = require('gm').subClass({ imageMagick: true });
+const path = require('path');
 const { promisify } = require('util');
 
 const readdir = promisify(fs.readdir);
@@ -18,8 +19,7 @@ main()
  */
 async function main() {
   try {
-    console.log(resolve(__dirname, process.env.INPUT_PATH || config.inputPath));
-    const files = await getMedia(resolve(
+    const files = await getMedia(path.resolve(
       __dirname,
       process.env.INPUT_PATH || config.inputPath
     ));
@@ -47,7 +47,7 @@ async function main() {
 async function getMedia(folder) {
   try {
     const list = await readdir(folder);
-    return list.map(file => resolve(folder, file));
+    return list.map(file => path.resolve(folder, file));
   } catch (err) {
     throw err;
   }
@@ -85,42 +85,80 @@ async function createThumbnails(options) {
     const maxSize = dimensions[i][baseValue] > options[baseValue]
       ? { width, height, }
       : dimensions[i];
-    const size = landscape ? `${maxSize.width}x?` : `?x${maxSize.height}`;
-    await createScreenshot({
-      file,
-      size,
-      outputPath,
-      dimensions: dimensions[i],
-    });
+    const extname = path.extname(file);
+    const noVideo = extname.includes('png') || extname.includes('jpg');
+    if (noVideo) {
+      await createResizedImage({
+        file,
+        size: maxSize,
+        outputPath,
+        dimensions: dimensions[i],
+      })
+    } else  {
+      await createScreenshot({
+        file,
+        size: landscape ? `${maxSize.width}x?` : `?x${maxSize.height}`,
+        outputPath,
+        dimensions: dimensions[i],
+      });
+    }
   }
 }
 
 /**
- * create screenshot of given media
+ * create screenshot of given video
  * @param {object} options
  * @returns {Promise<void>}
  */
 function createScreenshot(options) {
   return new Promise((resolve, reject) => {
     const { file, size, outputPath, count, } = options;
-    const { width, height, key } = options.dimensions;
-    const extension = extname(file);
-    const noVideo = extension.includes('png') || extension.includes('jpg');
-    const filename = key ? `%b_thumb_${key}.png` : `%b_thumb_${width}x${height}.png`;
-    const baseConfig = {
+    const filename = getFilename(options);
+    const config = {
       folder: outputPath,
       filename,
       size,
+      count: count || 3,
     };
-    const config = Object.assign(
-      {},
-      baseConfig,
-      noVideo ? { timestamps: ['00:00:000'], } : { count: count || 3, }
-    );
     ffmpeg(file)
       .on('error', err => reject(err))
       .on('filenames', filenames => console.log(`File(s) ${filenames.join(', ')} created.`))
       .on('end', () => resolve())
       .screenshots(config);
   });
+}
+
+/**
+ * create resized image of given image
+ * @param {object} options
+ * @returns {Promise<void>}
+ */
+function createResizedImage(options) {
+  return new Promise((resolve, reject) => {
+    const { file, outputPath, } = options;
+    const { width, height, } = options.size;
+    const filename = getFilename(options);
+    gm(file)
+      .resize(width, height)
+      .write(path.resolve(__dirname, outputPath, filename), err => {
+        if (err) {
+          reject(err);
+        } else {
+          console.log(`File ${filename} created.`);
+          resolve();
+        }
+      });
+  })
+}
+
+/**
+ * get export name
+ * @param {object} options
+ * @returns {string}
+ */
+function getFilename(options) {
+  const { file, } = options;
+  const { width, height, key, } = options.dimensions;
+  const basename = path.basename(file, path.extname(file));
+  return key ? `${basename}_thumb_${key}.png` : `${basename}_thumb_${width}x${height}.png`;
 }
